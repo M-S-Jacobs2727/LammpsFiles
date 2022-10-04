@@ -1,6 +1,6 @@
 module LammpsFiles
-# TODO: unwrap, write_data
 export read_data, read_dump, wrap, unwrap, write_data
+# TODO: unwrap, write_data
 using Logging
 
 struct DumpFrame

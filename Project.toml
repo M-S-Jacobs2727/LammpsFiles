@@ -1,6 +1,6 @@
 name = "LammpsFiles"
 uuid = "9fca0178-4402-11ed-b878-0242ac120002"
-authors = ["Michael Jacobs jacobsms@ornl.gov"]
+authors = ["Michael Jacobs <jacobsms@ornl.gov>"]
 version = "0.1.0"
 
 [deps]
