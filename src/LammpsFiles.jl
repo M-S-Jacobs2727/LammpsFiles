@@ -410,7 +410,7 @@ function read_dump(source)
         atoms = zeros(length(properties), natoms)  # transposed for performance(?)
         for i=1:natoms
             line = readline(f)
-            atoms[:, i] = parse.(Float32, split(line)[1:num_cols])
+            atoms[:, i] = parse.(Float32, split(line)[1:length(properties)])
         end
     end
 
