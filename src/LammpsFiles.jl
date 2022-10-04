@@ -1,4 +1,4 @@
-module Lammps
+module LammpsFiles
 # TODO: unwrap, write_data
 export read_data, read_dump, wrap, unwrap, write_data
 using Logging
