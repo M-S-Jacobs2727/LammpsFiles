@@ -393,7 +393,7 @@ function read_dump(source)
         while !occursin("ITEM: BOX BOUNDS", remove_comment(line))
             line = readline(f)
         end
-        box = zeros(3, 2)
+        box = zeros(Float32, 3, 2)
         values = split(remove_comment(readline(f)))
         box[1, : ] = [parse(Float32, values[1]), parse(Float32, values[2])]
         values = split(remove_comment(readline(f)))
