@@ -372,6 +372,8 @@ function read_dump(source)
     box = zeros(3, 2)
     atoms = zeros(1, 1)
     open(source, "r") do f
+        line = ""
+
         # Timestep, or truncated file
         while !eof(f)
             line = readline(f)
