@@ -1,0 +1,5 @@
+authors = ["Michael Jacobs jacobsms@ornl.gov",]
+name = "LammpsFiles"
+uuid = "9fca0178-4402-11ed-b878-0242ac120002"
+version = "0.1.0"
+
