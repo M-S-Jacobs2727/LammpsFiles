@@ -342,13 +342,10 @@ function read_data(source, atom_style="full")
     end
 end
 
+# TODO: return image flags
 function wrap(coords, box)
     L = box[:, 2] - box[:, 1]
-
-    # Assume coords is of size (d, natoms), where d=2 or 3
-    # and box is of size (d, 2)
-    coords = (coords .% L) .+ box[:, 1]
-    coords
+    return ((coords .- box[:, 1]) .% L) .+ box[:, 1]
 end
 
 function unwrap(coords, box, images)
@@ -356,14 +353,16 @@ function unwrap(coords, box, images)
     return nothing
 end
 
+# TODO: Improve performance of large dumpfiles using file pointers (like Frank), and
+# investigate mmap. -> moving to separate functions, `load_dump` and `read_frame`.
+# Alternately, just return an iterator over each snapshot, in order. Doing so will
+# require tasks. The main task will interact with the user, and the background task 
+# will be reading and holding the place in the file.
+# 
+# TODO: Implement dump_style yaml.
 """
 Read a single frame of data from a dump file.
 Currently only supports dump styles `custom` and `atom`.
-
-TODO: Improve performance of large dumpfiles using file pointers (like Frank), and
-investigate mmap. -> moving to separate functions, `load_dump` and `read_frame`
-
-TODO: Implement dump_style yaml.
 """
 function read_dump(source)
     timestep = 0
@@ -381,7 +380,10 @@ function read_dump(source)
                 break
             end
         end
-        if eof(f); return DumpFrame(timestep, natoms, properties, box, atoms); end
+        if eof(f)
+            @warn "Reached end of file before finding anything!"
+            return DumpFrame(timestep, natoms, properties, box, atoms)
+        end
         timestep = parse(Int, remove_comment(readline(f)))
 
         while remove_comment(line) != "ITEM: NUMBER OF ATOMS"
@@ -407,7 +409,7 @@ function read_dump(source)
         end
         properties = split(line)[3:end]
 
-        atoms = zeros(length(properties), natoms)  # transposed for performance(?)
+        atoms = zeros(Float32, length(properties), natoms)  # transposed for performance(?)
         for i=1:natoms
             line = readline(f)
             atoms[:, i] = parse.(Float32, split(line)[1:length(properties)])
