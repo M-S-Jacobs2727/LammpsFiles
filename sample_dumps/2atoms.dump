@@ -1,0 +1,11 @@
+ITEM: TIMESTEP
+0
+ITEM: NUMBER OF ATOMS
+2
+ITEM: BOX BOUNDS pp pp pp
+-1.0e+01 1.0e+01
+-1.0e+01 1.0e+01
+-1.0e+01 1.0e+01
+ITEM: ATOMS id mol type xu yu zu pxx pyy pzz
+1 0 1 0.56 0.56 0.56 1.07 1.07 1.08
+2 0 1 0.57 11.24 0.88 1.07 1.07 1.08 
