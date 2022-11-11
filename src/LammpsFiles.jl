@@ -1,6 +1,6 @@
 module LammpsFiles
 export read_data, read_dump, wrap, unwrap, write_data
-# TODO: unwrap, write_data
+# TODO: unwrap, write_data, read_data
 using Logging
 
 struct DumpFrame
@@ -30,20 +30,18 @@ struct snapshot
     improper_types::Array{<:Int}
 end
 
-function read_data_section(f, data)
-    datatype = eltype(data)
-    for i in 1:size(data, 1)
-        line = readline(f)
-        data[i, :] = [ parse(datatype, ss) for ss in split(strip(split(line, "#")[1])) ]
-    end
-    return data
-end
-
-
 function remove_comment(line)
     strip(split(line, "#")[1])
 end
 
+function read_data_section(f, data)
+    datatype = eltype(data)
+    for i in axes(data, 2) #eachindex(data[1, : ])
+        line = readline(f)
+        data[ : , i] = parse.(datatype, split(remove_comment(line)))
+    end
+    return data
+end
 
 """
 Unsupported atom_styles: template, hybrid, spin, dielectric, dipole
@@ -202,9 +200,9 @@ function read_data(source, atom_style="full")
                 readline(f)  # Skip next line
 
                 line = readline(f)
-                first_row_data = [ parse(Float32, ss) for ss in split(remove_comment(line)) ]
+                first_row_data = parse.(Float32, split(remove_comment(line)))
                 
-                num_cols = size(first_row_data, 1)
+                num_cols = length(first_row_data)
                 if num_cols != base_num_cols && num_cols != base_num_cols + 3
                     throw(DimensionMismatch("invalid number of columns in Atoms section of data file: \
                                          $(num_cols). Expected $(base_num_cols) or $(base_num_cols)"))
@@ -213,106 +211,103 @@ function read_data(source, atom_style="full")
                     image_flag = true
                 end
 
-                tmp_data = zeros(Float32, natoms, num_cols)
-                tmp_data[1, : ] = first_row_data
-                tmp_data[2:end, : ] = read_data_section(f, tmp_data[2:end, : ])
+                tmp_data = zeros(num_cols, natoms)
+                tmp_data[ : , 1] = first_row_data
+                tmp_data[ : , 2:end] = read_data_section(f, tmp_data[ : , 2:end])
 
-                indices = sortperm(tmp_data[:, 1])
-                tmp_data = tmp_data[indices, : ]
+                indices = sortperm(tmp_data[1, : ])
+                tmp_data = tmp_data[ : , indices]
                 
-                atom_ids = convert(Array{Int}, tmp_data[:, 1])
+                atom_ids = Integer.(tmp_data[1, : ])
                 if atom_style == "atomic"
-                    atom_types = convert(Array{Int}, tmp_data[:, 2])
-                    coords = tmp_data[:, 3:5]
+                    atom_types = Integer.(tmp_data[2, : ])
+                    coords = tmp_data[3:5, : ]'
                 elseif atom_style == "charge"
-                    atom_types = convert(Array{Int}, tmp_data[:, 2])
-                    charges = tmp_data[:, 3]
-                    coords = tmp_data[:, 4:6]
+                    atom_types = Integer.(tmp_data[2, : ])
+                    charges = tmp_data[3, : ]
+                    coords = tmp_data[4:6, : ]'
                 elseif (
                     atom_style == "molecular"
                     || atom_style == "bond"
                     || atom_style == "angle"
                 )
-                    molecules = convert(Array{Int}, tmp_data[:, 2])
-                    atom_types = convert(Array{Int}, tmp_data[:, 3])
-                    coords = tmp_data[:, 4:6]
+                    molecules = Integer.(tmp_data[2, : ])
+                    atom_types = Integer.(tmp_data[3, : ])
+                    coords = tmp_data[4:6, : ]'
                 elseif atom_style == "full"
-                    molecules = convert(Array{Int}, tmp_data[:, 2])
-                    atom_types = convert(Array{Int}, tmp_data[:, 3])
-                    charges = tmp_data[:, 4]
-                    coords = tmp_data[:, 5:7]
+                    molecules = Integer.(tmp_data[2, : ])
+                    atom_types = Integer.(tmp_data[3, : ])
+                    charges = tmp_data[4, : ]
+                    coords = tmp_data[5:7, : ]'
                 elseif (
                     atom_style == "line
                     mesont
                     bpm/sphere
                     tri"
                 )
-                    molecules = convert(Array{Int}, tmp_data[:, 2])
-                    atom_types = convert(Array{Int}, tmp_data[:, 3])
-                    the_rest = image_flag ? tmp_data[:, 4:end-6] : tmp_data[:, 4:end-3]
-                    coords = image_flag ? tmp_data[:, end-5:end-3] : tmp_data[:, end-2:end]
+                    molecules = Integer.(tmp_data[2, : ])
+                    atom_types = Integer.(tmp_data[3, : ])
+                    the_rest = image_flag ? tmp_data[4:end-6, : ]' : tmp_data[4:end-3, : ]'
+                    coords = image_flag ? tmp_data[end-5:end-3, : ]' : tmp_data[end-2:end, : ]'
                 else
-                    atom_types = convert(Array{Int}, tmp_data[:, 2])
-                    the_rest = image_flag ? tmp_data[:, 4:end-6] : tmp_data[:, 4:end-3]
-                    coords = image_flag ? tmp_data[:, end-5:end-3] : tmp_data[:, end-2:end]
+                    atom_types = Integer.(tmp_data[2, : ])
+                    the_rest = image_flag ? tmp_data[4:end-6, : ]' : tmp_data[4:end-3, : ]'
+                    coords = image_flag ? tmp_data[end-5:end-3, : ]' : tmp_data[end-2:end, : ]'
                 end
                 if image_flag
-                    images = convert(Array{Int}, tmp_data[:, end-2:end])
+                    images = Integer.(tmp_data[end-2:end, : ]')
                 end
             elseif occursin("Velocities", line)
                 readline(f)  # Blank
-                data = zeros(natoms, 4)
+                data = zeros(4, natoms)
                 data = read_data_section(f, data)
                 # Try applying indices from Atoms section to sort velocities by ID
                 # Check if sorted. If not, sort normally. Will usually save time.
-                if issorted(data[:, 1][indices, : ])
-                    velocities = data[:, 2:4][indices, : ]
-                else
-                    velocities = data[:, 2:4][sortperm(data[:, 1]), : ]
-                end
-            elseif occursin("Masses", line)
+                issorted(data[1, indices]) || (indices = sortperm(data[1, : ]))
+                velocities = data[2:4, indices]'
+            elseif occursin("Masses", line)  # Not yet implemented
                 readline(f)  # Blank
                 for i in 1:natom_types; readline(f); end
             elseif nbonds > 0 && occursin("Bonds", line)
                 readline(f)  # Blank
-                data = zeros(Int, nbonds, 4)
+                data = zeros(Integer, 4, nbonds)
                 data = read_data_section(f, data)
-                bond_types = data[:, 2]
-                bonds = data[:, 3:4]
+                bond_types = data[2, : ]
+                bonds = data[3:4, : ]'
             elseif nangles > 0 && occursin("Angles", line)
                 readline(f)  # Blank
-                data = zeros(Int, nangles, 5)
+                data = zeros(Integer, 5, nangles)
                 data = read_data_section(f, data)
-                angle_types = data[:, 2]
-                angles = data[:, 3:5]
+                angle_types = data[2, : ]
+                angles = data[3:5, : ]'
             elseif ndihedrals > 0 && occursin("Dihedrals", line)
                 readline(f)  # Blank
-                data = zeros(Int, ndihedrals, 6)
+                data = zeros(Integer, 6, ndihedrals)
                 data = read_data_section(f, data)
-                dihedral_types = data[:, 2]
-                dihedrals = data[:, 3:6]
+                dihedral_types = data[2, : ]
+                dihedrals = data[3:6, : ]'
             elseif nimpropers > 0 && occursin("Impropers", line)
                 readline(f)  # Blank
-                data = zeros(Int, nimpropers, 6)
+                data = zeros(Integer, 7, nimpropers)
                 data = read_data_section(f, data)
-                improper_types = data[:, 2]
-                impropers = data[:, 3:6]
-            elseif occursin("Pair Coeffs", line)
+                improper_types = data[2, : ]
+                impropers = data[3:6, : ]'
+            elseif occursin("Pair Coeffs", line)  # Not yet implemented
                 readline(f)  # Blank
                 for i in 1:natom_types; readline(f); end
-            elseif occursin("PairIJ Coeffs", line)
+            elseif occursin("PairIJ Coeffs", line)  # Not yet implemented
                 readline(f)  # Blank
                 for i in 1:(natom_types*(natom_types-1)); readline(f); end
-            elseif nbonds > 0 && occursin("Bonds Coeffs", line)
+            elseif nbonds > 0 && occursin("Bonds Coeffs", line)  # Not yet implemented
                 readline(f)  # Blank
                 for i in 1:nbond_types; readline(f); end
-            elseif nangles > 0 && occursin("Angle Coeffs", line)
+            elseif nangles > 0 && occursin("Angle Coeffs", line)  # Not yet implemented
                 readline(f)  # Blank
                 for i in 1:nangle_types; readline(f); end
-            elseif ndihedrals > 0 && occursin("Dihedral Coeffs", line)
+            elseif ndihedrals > 0 && occursin("Dihedral Coeffs", line)  # Not yet implemented
                 readline(f)  # Blank
                 for i in 1:ndihedral_types; readline(f); end
-            elseif nimpropers > 0 && occursin("Improper Coeffs", line)
+            elseif nimpropers > 0 && occursin("Improper Coeffs", line)  # Not yet implemented
                 readline(f)  # Blank
                 for i in 1:nimproper_types; readline(f); end
             end
