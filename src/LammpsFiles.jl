@@ -337,14 +337,19 @@ function read_data(source, atom_style="full")
     end
 end
 
-# TODO: return image flags
-function wrap(coords, box)
-    L = box[:, 2] - box[:, 1]
-    return ((coords .- box[:, 1]) .% L) .+ box[:, 1]
+function wrap!(box, coords, images=nothing)
+    boxlo, boxhi = box[ : , 1], box[ : , 2]
+    L = boxhi - boxlo
+    if images !== nothing
+        images += fld.(coords .- boxlo, L)
+    end
+    coords = ((coords .- boxlo) .% L) .+ boxlo
+    return nothing
 end
 
-function unwrap(coords, box, images)
-    L = box[:, 2] .- box[:, 1]
+function unwrap!(box, coords, images, bonds=nothing)  # Not yet implemented
+    boxlo, boxhi = box[ : , 1], box[ : , 2]
+    L = boxhi - boxlo
     return nothing
 end
 
