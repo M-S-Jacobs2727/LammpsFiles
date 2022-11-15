@@ -324,6 +324,7 @@ function readData(source, atom_style="full")
         end
         snapshot(
             atom_ids,
+            idtoindex,
             molecules,
             atom_types,
             charges,
