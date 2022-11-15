@@ -12,22 +12,23 @@ struct DumpFrame
 end
 
 struct snapshot
-    atom_ids::Array{<:Int}
-    molecules::Array{<:Int}
-    atom_types::Array{<:Int}
-    charges::Array{<:Real}
-    coords::Array{<:Real}
-    images::Array{<:Int}
-    velocities::Array{<:Real}
-    the_rest::Array{<:Real}
-    bonds::Array{<:Int}
-    angles::Array{<:Int}
-    dihedrals::Array{<:Int}
-    impropers::Array{<:Int}
-    bond_types::Array{<:Int}
-    angle_types::Array{<:Int}
-    dihedral_types::Array{<:Int}
-    improper_types::Array{<:Int}
+    atom_ids::Vector{<:Integer}
+    idtoindex::Vector{<:Integer}
+    molecules::Vector{<:Integer}
+    atom_types::Vector{<:Integer}
+    charges::Vector{<:Real}
+    coords::Matrix{<:Real}
+    images::Matrix{<:Integer}
+    velocities::Matrix{<:Real}
+    the_rest::Matrix{<:Real}
+    bonds::Matrix{<:Integer}
+    angles::Matrix{<:Integer}
+    dihedrals::Matrix{<:Integer}
+    impropers::Matrix{<:Integer}
+    bond_types::Vector{<:Integer}
+    angle_types::Vector{<:Integer}
+    dihedral_types::Vector{<:Integer}
+    improper_types::Vector{<:Integer}
 end
 
 function removeComment(line)
@@ -257,6 +258,11 @@ function readData(source, atom_style="full")
                 if image_flag
                     images = Integer.(tmp_data[end-2:end, : ]')
                 end
+                idtoindex = zeros(maximum(atom_ids))
+                for (i, a) in enumerate(atom_ids)
+                    idtoindex[a] = i
+                end
+
             elseif occursin("Velocities", line)
                 readline(f)  # Blank
                 data = zeros(4, natoms)
