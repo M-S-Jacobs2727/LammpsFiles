@@ -1,5 +1,5 @@
 module LammpsFiles
-export read_data, read_dump, wrap, unwrap, write_data
+export readData, readDump, wrap, unwrap, writeData
 # TODO: unwrap, write_data, read_data
 using Logging
 
@@ -30,15 +30,15 @@ struct snapshot
     improper_types::Array{<:Int}
 end
 
-function remove_comment(line)
+function removeComment(line)
     strip(split(line, "#")[1])
 end
 
-function read_data_section(f, data)
+function readDataSection(f, data)
     datatype = eltype(data)
     for i in axes(data, 2) #eachindex(data[1, : ])
         line = readline(f)
-        data[ : , i] = parse.(datatype, split(remove_comment(line)))
+        data[ : , i] = parse.(datatype, split(removeComment(line)))
     end
     return data
 end
@@ -46,7 +46,7 @@ end
 """
 Unsupported atom_styles: template, hybrid, spin, dielectric, dipole
 """
-function read_data(source, atom_style="full")
+function readData(source, atom_style="full")
     if atom_style == "atomic"
         base_num_cols = 5
     elseif (
@@ -99,7 +99,7 @@ function read_data(source, atom_style="full")
         # Parse header, read until non-blank line without header keyword
         while true
             line = readline(f)
-            line = remove_comment(line)
+            line = removeComment(line)
             if line == ""
                 continue
             end
@@ -184,7 +184,7 @@ function read_data(source, atom_style="full")
         # Body sections
         indices = zeros(Int, natoms)  # for sorting
         while true
-            if remove_comment(line) == ""
+            if removeComment(line) == ""
                 line = readline(f)
                 continue
             end
@@ -200,7 +200,7 @@ function read_data(source, atom_style="full")
                 readline(f)  # Skip next line
 
                 line = readline(f)
-                first_row_data = parse.(Float32, split(remove_comment(line)))
+                first_row_data = parse.(Float32, split(removeComment(line)))
                 
                 num_cols = length(first_row_data)
                 if num_cols != base_num_cols && num_cols != base_num_cols + 3
@@ -213,7 +213,7 @@ function read_data(source, atom_style="full")
 
                 tmp_data = zeros(num_cols, natoms)
                 tmp_data[ : , 1] = first_row_data
-                tmp_data[ : , 2:end] = read_data_section(f, tmp_data[ : , 2:end])
+                tmp_data[ : , 2:end] = readDataSection(f, tmp_data[ : , 2:end])
 
                 indices = sortperm(tmp_data[1, : ])
                 tmp_data = tmp_data[ : , indices]
@@ -260,7 +260,7 @@ function read_data(source, atom_style="full")
             elseif occursin("Velocities", line)
                 readline(f)  # Blank
                 data = zeros(4, natoms)
-                data = read_data_section(f, data)
+                data = readDataSection(f, data)
                 # Try applying indices from Atoms section to sort velocities by ID
                 # Check if sorted. If not, sort normally. Will usually save time.
                 issorted(data[1, indices]) || (indices = sortperm(data[1, : ]))
@@ -271,25 +271,25 @@ function read_data(source, atom_style="full")
             elseif nbonds > 0 && occursin("Bonds", line)
                 readline(f)  # Blank
                 data = zeros(Integer, 4, nbonds)
-                data = read_data_section(f, data)
+                data = readDataSection(f, data)
                 bond_types = data[2, : ]
                 bonds = data[3:4, : ]'
             elseif nangles > 0 && occursin("Angles", line)
                 readline(f)  # Blank
                 data = zeros(Integer, 5, nangles)
-                data = read_data_section(f, data)
+                data = readDataSection(f, data)
                 angle_types = data[2, : ]
                 angles = data[3:5, : ]'
             elseif ndihedrals > 0 && occursin("Dihedrals", line)
                 readline(f)  # Blank
                 data = zeros(Integer, 6, ndihedrals)
-                data = read_data_section(f, data)
+                data = readDataSection(f, data)
                 dihedral_types = data[2, : ]
                 dihedrals = data[3:6, : ]'
             elseif nimpropers > 0 && occursin("Impropers", line)
                 readline(f)  # Blank
                 data = zeros(Integer, 7, nimpropers)
-                data = read_data_section(f, data)
+                data = readDataSection(f, data)
                 improper_types = data[2, : ]
                 impropers = data[3:6, : ]'
             elseif occursin("Pair Coeffs", line)  # Not yet implemented
@@ -364,7 +364,7 @@ end
 Read a single frame of data from a dump file.
 Currently only supports dump styles `custom` and `atom`.
 """
-function read_dump(source)
+function readDump(source)
     timestep = 0
     natoms = 0
     properties = Vector{String}(undef, 1)
@@ -376,7 +376,7 @@ function read_dump(source)
         # Timestep, or truncated file
         while !eof(f)
             line = readline(f)
-            if remove_comment(line) == "ITEM: TIMESTEP"
+            if removeComment(line) == "ITEM: TIMESTEP"
                 break
             end
         end
@@ -384,28 +384,28 @@ function read_dump(source)
             @warn "Reached end of file before finding anything!"
             return DumpFrame(timestep, natoms, properties, box, atoms)
         end
-        timestep = parse(Int, remove_comment(readline(f)))
+        timestep = parse(Int, removeComment(readline(f)))
 
-        while remove_comment(line) != "ITEM: NUMBER OF ATOMS"
+        while removeComment(line) != "ITEM: NUMBER OF ATOMS"
             line = readline(f)
         end
-        natoms = parse(Int, remove_comment(readline(f)))
+        natoms = parse(Int, removeComment(readline(f)))
         
         # Box
-        while !occursin("ITEM: BOX BOUNDS", remove_comment(line))
+        while !occursin("ITEM: BOX BOUNDS", removeComment(line))
             line = readline(f)
         end
         box = zeros(Float32, 3, 2)
-        values = split(remove_comment(readline(f)))
+        values = split(removeComment(readline(f)))
         box[1, : ] = [parse(Float32, values[1]), parse(Float32, values[2])]
-        values = split(remove_comment(readline(f)))
+        values = split(removeComment(readline(f)))
         box[2, : ] = [parse(Float32, values[1]), parse(Float32, values[2])]
-        values = split(remove_comment(readline(f)))
+        values = split(removeComment(readline(f)))
         box[3, : ] = [parse(Float32, values[1]), parse(Float32, values[2])]
         
         # Atoms
         while !occursin("ITEM: ATOMS", line)
-            line = remove_comment(readline(f))
+            line = removeComment(readline(f))
         end
         properties = split(line)[3:end]
 
@@ -419,7 +419,7 @@ function read_dump(source)
     return DumpFrame(timestep, natoms, properties, box, atoms)
 end
 
-function write_data(source, snapshot, atom_style)
+function writeData(source, snapshot, atom_style)
     return nothing
 end
 

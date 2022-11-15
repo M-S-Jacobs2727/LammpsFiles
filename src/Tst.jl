@@ -5,7 +5,7 @@ import .LammpsFiles
 using Test
 
 @testset "read_dump 2 atoms" begin
-    frame = LammpsFiles.read_dump("../sample_dumps/2atoms.dump")
+    frame = LammpsFiles.readDump("../sample_dumps/2atoms.dump")
     @debug "$(frame.natoms)\n$(frame.timestep)\n$(frame.box)\n$(frame.properties)\n$(frame.atoms)"
     @test frame.natoms == 2
     @test frame.timestep == 0
@@ -15,7 +15,7 @@ using Test
 end
 
 @testset "wrap 2 atoms" begin
-    frame = LammpsFiles.read_dump("../sample_dumps/2atoms.dump")
+    frame = LammpsFiles.readDump("../sample_dumps/2atoms.dump")
     @test isapprox(LammpsFiles.wrap(frame.atoms[4:6, : ], frame.box), Float32[0.56 0.57; 0.56 -8.76; 0.56 0.88])
 end
 end
