@@ -8,7 +8,7 @@ struct DumpFrame
     idtoindex::Vector{<:Integer}
 end
 
-function removeComment(line)
+function removeComment(line::AbstractString)
     strip(split(line, "#")[1])
 end
 
@@ -23,7 +23,7 @@ end
 Read a single frame of data from a dump file.
 Currently only supports dump styles `custom` and `atom`.
 """
-function readDump(source)
+function readDump(source::AbstractString)
     timestep = 0
     natoms = 0
     properties = Vector{String}(undef, 1)

@@ -20,11 +20,11 @@ struct snapshot
     improper_types::Vector{<:Integer}
 end
 
-function removeComment(line)
+function removeComment(line::AbstractString)
     strip(split(line, "#")[1])
 end
 
-function readDataSection(f, data)
+function readDataSection(f::IOStream, data::Matrix{Any})
     datatype = eltype(data)
     for i in axes(data, 2) #eachindex(data[1, : ])
         line = readline(f)
@@ -36,7 +36,7 @@ end
 """
 Unsupported atom_styles: template, hybrid, spin, dielectric, dipole
 """
-function readData(source, atom_style="full")
+function readData(source::AbstractString, atom_style::AbstractString="full")
     if atom_style == "atomic"
         base_num_cols = 5
     elseif (
@@ -333,6 +333,6 @@ function readData(source, atom_style="full")
     )
 end
 
-function writeData(source, snapshot, atom_style)
+function writeData(source::AbstractString, snap::snapshot, atom_style::AbstractString)
     return nothing
 end
