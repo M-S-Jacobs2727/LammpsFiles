@@ -9,6 +9,7 @@ struct DumpFrame
     properties::Vector{String}
     box::Matrix{<:Real}
     atoms::Matrix{<:Real}  # with size (length(properties), natoms) (i.e., each row is a property, each column is an atom)
+    idtoindex::Vector{<:Integer}
 end
 
 struct snapshot
@@ -377,6 +378,7 @@ function readDump(source)
     properties = Vector{String}(undef, 1)
     box = zeros(3, 2)
     atoms = zeros(1, 1)
+    idtoindex = zeros(1)
     open(source, "r") do f
         line = ""
 
@@ -389,7 +391,7 @@ function readDump(source)
         end
         if eof(f)
             @warn "Reached end of file before finding anything!"
-            return DumpFrame(timestep, natoms, properties, box, atoms)
+            return DumpFrame(timestep, natoms, properties, box, atoms, idtoindex)
         end
         timestep = parse(Int, removeComment(readline(f)))
 
@@ -422,8 +424,13 @@ function readDump(source)
             atoms[:, i] = parse.(Float32, split(line)[1:length(properties)])
         end
     end
+    atom_ids = atoms[findfirst(x->x=="id", properties), : ]
+    idtoindex = zeros(maximum(atom_ids))
+    for (i, a) in enumerate(atom_ids)
+        idtoindex[a] = i
+    end
 
-    return DumpFrame(timestep, natoms, properties, box, atoms)
+    return DumpFrame(timestep, natoms, properties, box, atoms, idtoindex)
 end
 
 function writeData(source, snapshot, atom_style)
