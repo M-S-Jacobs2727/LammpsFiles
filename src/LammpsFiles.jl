@@ -206,7 +206,7 @@ function readData(source, atom_style="full")
                 num_cols = length(first_row_data)
                 if num_cols != base_num_cols && num_cols != base_num_cols + 3
                     throw(DimensionMismatch("invalid number of columns in Atoms section of data file: \
-                                         $(num_cols). Expected $(base_num_cols) or $(base_num_cols)"))
+                                         $(num_cols). Expected $(base_num_cols) or $(base_num_cols+3)"))
                 end
                 if num_cols == base_num_cols + 3
                     image_flag = true
