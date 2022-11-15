@@ -1,21 +1,11 @@
-
-struct DumpFrame
-    timestep::Int
-    natoms::Int
-    properties::Vector{String}
-    box::Matrix{<:Real}
-    atoms::Matrix{<:Real}  # with size (length(properties), natoms) (i.e., each row is a property, each column is an atom)
-    idtoindex::Vector{<:Integer}
-end
+using Logging
 
 function removeComment(line::AbstractString)
     strip(split(line, "#")[1])
 end
 
-# TODO: Improve performance of large dumpfiles using file pointers (like Frank), and
-# investigate mmap. -> moving to separate functions, `load_dump` and `read_frame`.
-# Alternately, just return an iterator over each snapshot, in order. Doing so will
-# require tasks. The main task will interact with the user, and the background task 
+# TODO: Improve performance of large dumpfiles via tasks and an iterator
+# The main task will interact with the user, and the background task 
 # will be reading and holding the place in the file.
 # 
 # TODO: Implement dump_style yaml.
@@ -28,6 +18,7 @@ function readDump(source::AbstractString)
     natoms = 0
     properties = Vector{String}(undef, 1)
     box = zeros(3, 2)
+    tilt = zeros(3)
     atoms = zeros(1, 1)
     idtoindex = zeros(1)
     open(source, "r") do f
@@ -42,7 +33,15 @@ function readDump(source::AbstractString)
         end
         if eof(f)
             @warn "Reached end of file before finding anything!"
-            return DumpFrame(timestep, natoms, properties, box, atoms, idtoindex)
+            return (
+                timestep=timestep,
+                natoms=natoms,
+                properties=properties,
+                box=box,
+                tilt=tilt,
+                atoms=atoms,
+                idtoindex=idtoindex
+            )
         end
         timestep = parse(Int, removeComment(readline(f)))
 
@@ -55,13 +54,21 @@ function readDump(source::AbstractString)
         while !occursin("ITEM: BOX BOUNDS", removeComment(line))
             line = readline(f)
         end
-        box = zeros(Float32, 3, 2)
+        box = zeros(Float64, 3, 2)
+        tilt = zeros(Float64, 3)
+        hastilt = occursin("xy", line)
+        
         values = split(removeComment(readline(f)))
-        box[1, : ] = [parse(Float32, values[1]), parse(Float32, values[2])]
+        box[1, : ] = [parse(Float64, values[1]), parse(Float64, values[2])]
+        if hastilt tilt[1] = parse(Float64, values[3]) end
+        
         values = split(removeComment(readline(f)))
-        box[2, : ] = [parse(Float32, values[1]), parse(Float32, values[2])]
+        box[2, : ] = [parse(Float64, values[1]), parse(Float64, values[2])]
+        if hastilt tilt[2] = parse(Float64, values[3]) end
+        
         values = split(removeComment(readline(f)))
-        box[3, : ] = [parse(Float32, values[1]), parse(Float32, values[2])]
+        box[3, : ] = [parse(Float64, values[1]), parse(Float64, values[2])]
+        if hastilt tilt[3] = parse(Float64, values[3]) end
         
         # Atoms
         while !occursin("ITEM: ATOMS", line)
@@ -69,17 +76,26 @@ function readDump(source::AbstractString)
         end
         properties = split(line)[3:end]
 
-        atoms = zeros(Float32, length(properties), natoms)  # transposed for performance(?)
-        for i=1:natoms
+        atoms = zeros(Float64, length(properties), natoms)
+        for i in axes(atoms, 2)
             line = readline(f)
-            atoms[:, i] = parse.(Float32, split(line)[1:length(properties)])
+            atoms[:, i] = parse.(Float64, split(line)[1:length(properties)])
         end
     end
+
     atom_ids = atoms[findfirst(x->x=="id", properties), : ]
     idtoindex = zeros(maximum(atom_ids))
     for (i, a) in enumerate(atom_ids)
         idtoindex[a] = i
     end
 
-    return DumpFrame(timestep, natoms, properties, box, atoms, idtoindex)
+    return (
+        timestep=timestep,
+        natoms=natoms,
+        properties=properties,
+        box=box,
+        tilt=tilt,
+        atoms=atoms,
+        idtoindex=idtoindex
+    )
 end
