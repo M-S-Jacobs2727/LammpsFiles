@@ -322,26 +322,26 @@ function readData(source, atom_style="full")
                 break
             end
         end
-        snapshot(
-            atom_ids,
-            idtoindex,
-            molecules,
-            atom_types,
-            charges,
-            coords,
-            images,
-            velocities,
-            the_rest,
-            bonds,
-            angles,
-            dihedrals,
-            impropers,
-            bond_types,
-            angle_types,
-            dihedral_types,
-            improper_types
-        )
     end
+    snapshot(
+        atom_ids,
+        idtoindex,
+        molecules,
+        atom_types,
+        charges,
+        coords,
+        images,
+        velocities,
+        the_rest,
+        bonds,
+        angles,
+        dihedrals,
+        impropers,
+        bond_types,
+        angle_types,
+        dihedral_types,
+        improper_types
+    )
 end
 
 function wrap!(box, coords, images=nothing)
