@@ -8,6 +8,10 @@ struct DumpFrame
     idtoindex::Vector{<:Integer}
 end
 
+function removeComment(line)
+    strip(split(line, "#")[1])
+end
+
 # TODO: Improve performance of large dumpfiles using file pointers (like Frank), and
 # investigate mmap. -> moving to separate functions, `load_dump` and `read_frame`.
 # Alternately, just return an iterator over each snapshot, in order. Doing so will
