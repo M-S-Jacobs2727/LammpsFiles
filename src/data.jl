@@ -281,32 +281,44 @@ consistent, etc.
 """
 function verifySnapshot(snapshot::Dict{String, <:Array{<:Real}}, atom_style::AbstractString)
     atomIDs = snapshot["atomIDs"]
-    ndims(atomIDs) != 1 && throw(DimensionMismatch(
-        "atomIDs must have 1 dimenstion, found $(ndims(atomIDs))"
+    if ndims(atomIDs) != 1
+        throw(DimensionMismatch(
+            "atomIDs must have 1 dimenstion, found $(ndims(atomIDs))"
         ))
+    end
     natoms = length(atomIDs)
     
     atom_types = snapshot["atom_types"]
-    ndims(atom_types) != 1 && throw(DimensionMismatch(
-        "atom_types must have 1 dimenstion, found $(ndims(atom_types))"
+    if ndims(atom_types) != 1
+        throw(DimensionMismatch(
+            "atom_types must have 1 dimenstion, found $(ndims(atom_types))"
         ))
-    length(atom_types) != natoms && throw(DimensionMismatch(
-        "atom_types must have the same length as atomIDs," *
-        " found $(length(atom_types)) and $natoms, respectively"
-    ))
+    end
+    if length(atom_types) != natoms
+        throw(DimensionMismatch(
+            "atom_types must have the same length as atomIDs," *
+            " found $(length(atom_types)) and $natoms, respectively"
+        ))
+    end
     natom_types = maximum(atom_types)
         
     coords = snapshot["coords"]
-    ndims(coords) != 2 && throw(DimensionMismatch(
-        "coords must have 1 dimenstion, found $(ndims(coords))"
-    ))
-    size(coords, 1) != natoms && throw(DimensionMismatch(
-        "coords must have the same dim-1 length as atomIDs," *
-        " found $(size(coords, 1)) and $natoms, respectively"
-    ))
-    size(coords, 2) != 3 && throw(DimensionMismatch(
-        "coords must have 3 columns, found $(size(coords, 2))"
-    ))
+    if ndims(coords) != 2
+        throw(DimensionMismatch(
+            "coords must have 1 dimenstion, found $(ndims(coords))"
+        ))
+    end
+    if size(coords, 1) != natoms
+        throw(DimensionMismatch(
+            "coords must have the same dim-1 length as atomIDs," *
+            " found $(size(coords, 1)) and $natoms, respectively"
+        ))
+    end
+    if size(coords, 2) != 3
+        throw(DimensionMismatch(
+            "coords must have 3 columns, found $(size(coords, 2))"
+        ))
+    end
 
 end
 
