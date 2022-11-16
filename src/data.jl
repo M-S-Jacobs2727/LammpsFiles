@@ -143,8 +143,8 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
                 if m !== nothing
                     atom_style_hint = m.captures[2]
                     if atom_style != atom_style_hint
-                        @warn "Provided atom_style $(atom_style) does not match atom_style hint \
-                            found in data file, $(atom_style_hint). Using provided atom_style $(atom_style)"
+                        @warn "Provided atom_style $(atom_style) does not match atom_style hint" *
+                            " found in data file, $(atom_style_hint). Using provided atom_style $(atom_style)."
                     end
                 end
                 readline(f)  # Skip next line
@@ -154,8 +154,10 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
                 
                 num_cols = length(first_row_data)
                 if num_cols != base_num_cols && num_cols != base_num_cols + 3
-                    throw(DimensionMismatch("invalid number of columns in Atoms section of data file: \
-                                         $(num_cols). Expected $(base_num_cols) or $(base_num_cols+3)"))
+                    throw(DimensionMismatch(
+                        "invalid number of columns in Atoms section of data file:" *
+                        " $(num_cols). Expected $(base_num_cols) or $(base_num_cols+3)"
+                    ))
                 end
                 if num_cols == base_num_cols + 3
                     image_flag = true
@@ -289,8 +291,8 @@ function verifySnapshot(snapshot::Dict{String, <:Array{<:Real}}, atom_style::Abs
         "atom_types must have 1 dimenstion, found $(ndims(atom_types))"
         ))
     length(atom_types) != natoms && throw(DimensionMismatch(
-        "atom_types must have the same length as atomIDs, \
-         found $(length(atom_types)) and $natoms, respectively"
+        "atom_types must have the same length as atomIDs," *
+        " found $(length(atom_types)) and $natoms, respectively"
     ))
     natom_types = maximum(atom_types)
         
@@ -299,8 +301,8 @@ function verifySnapshot(snapshot::Dict{String, <:Array{<:Real}}, atom_style::Abs
         "coords must have 1 dimenstion, found $(ndims(coords))"
     ))
     size(coords, 1) != natoms && throw(DimensionMismatch(
-        "coords must have the same dim-1 length as atomIDs, \
-         found $(size(coords, 1)) and $natoms, respectively"
+        "coords must have the same dim-1 length as atomIDs," *
+        " found $(size(coords, 1)) and $natoms, respectively"
     ))
     size(coords, 2) != 3 && throw(DimensionMismatch(
         "coords must have 3 columns, found $(size(coords, 2))"
@@ -311,8 +313,8 @@ end
 function writeData(datafile::AbstractString, snapshot::Dict{String, <:Array{<:Real}}, atom_style::AbstractString)
     if !(atom_style in ["atomic", "molecular", "angle", "bond", "charge", "full"])
         throw(ArgumentError(
-            "Invalid atom_style '$atom_style'. Must be one of \
-             'atomic', 'molecular', 'angle', 'bond', 'charge', or 'full'."
+            "Invalid atom_style '$atom_style'. Must be one of" *
+            " 'atomic', 'molecular', 'angle', 'bond', 'charge', or 'full'."
         ))
     end
 
