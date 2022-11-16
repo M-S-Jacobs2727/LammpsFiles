@@ -1,25 +1,5 @@
 using Logging
 
-struct snapshot
-    atom_ids::Vector{<:Integer}
-    idtoindex::Vector{<:Integer}
-    molecules::Vector{<:Integer}
-    atom_types::Vector{<:Integer}
-    charges::Vector{<:Real}
-    coords::Matrix{<:Real}
-    images::Matrix{<:Integer}
-    velocities::Matrix{<:Real}
-    the_rest::Matrix{<:Real}
-    bonds::Matrix{<:Integer}
-    angles::Matrix{<:Integer}
-    dihedrals::Matrix{<:Integer}
-    impropers::Matrix{<:Integer}
-    bond_types::Vector{<:Integer}
-    angle_types::Vector{<:Integer}
-    dihedral_types::Vector{<:Integer}
-    improper_types::Vector{<:Integer}
-end
-
 function removeComment(line::AbstractString)
     strip(split(line, "#")[1])
 end
@@ -46,7 +26,7 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
         || atom_style == "charge"
         || atom_style == "dpd"
         || atom_style == "mdpd"
-    )
+        )
         base_num_cols = 6
     elseif (
         atom_style == "full"
@@ -55,7 +35,7 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
         || atom_style == "ellipsoid"
         || atom_style == "peri"
         || atom_style == "sphere"
-    )
+        )
         base_num_cols = 7
     elseif (
         atom_style == "electron"
@@ -64,7 +44,7 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
         || atom_style == "bpm/sphere"
         || atom_style == "template"
         || atom_style == "tri"
-    )
+        )
         base_num_cols = 8
     elseif atom_style == "mesont" || atom_style == "wavepacket"
         base_num_cols = 11
@@ -73,7 +53,8 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
     else
         throw(ArgumentError("invalid atom_style `$(atom_style)`"))
     end
-
+    
+    return_dict = Dict{String, <:Array{<:Real}}()
     open(source, "r") do f
         readline(f)  # skip first line
         line = readline(f)  # next line blank
@@ -81,13 +62,11 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
         # Header values
         natoms = natom_types = nbonds = nbond_types = nangles = nangle_types = \ 
             ndihedrals = ndihedral_types = nimpropers = nimproper_types = 0
-        box = zeros(3, 2)
-        tilt = zeros(3)
 
         image_flag = false
 
         # Parse header, read until non-blank line without header keyword
-        while true
+        while !eof(f)
             line = readline(f)
             line = removeComment(line)
             if line == ""
@@ -95,37 +74,37 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
             end
             
             if occursin("atoms", line)
-                natoms = parse(Int, split(line, " atoms")[1])
+                natoms = parse(Int, split(line)[1])
             elseif occursin("bonds", line)
-                nbonds = parse(Int, split(line, " bonds")[1])
+                nbonds = parse(Int, split(line)[1])
             elseif occursin("angles", line)
-                nangles = parse(Int, split(line, " angles")[1])
+                nangles = parse(Int, split(line)[1])
             elseif occursin("dihedrals", line)
-                ndihedrals = parse(Int, split(line, " dihedrals")[1])
+                ndihedrals = parse(Int, split(line)[1])
             elseif occursin("impropers", line)
-                nimpropers = parse(Int, split(line, " impropers")[1])
+                nimpropers = parse(Int, split(line)[1])
             elseif occursin("atom types", line)
-                natom_types = parse(Int, split(line, " atom types")[1])
+                natom_types = parse(Int, split(line)[1])
             elseif occursin("bond types", line)
-                nbond_types = parse(Int, split(line, " bond types")[1])
+                nbond_types = parse(Int, split(line)[1])
             elseif occursin("angle types", line)
-                nangle_types = parse(Int, split(line, " angle types")[1])
+                nangle_types = parse(Int, split(line)[1])
             elseif occursin("dihedral types", line)
-                ndihedral_types = parse(Int, split(line, " dihedral types")[1])
+                ndihedral_types = parse(Int, split(line)[1])
             elseif occursin("improper types", line)
-                nimproper_types = parse(Int, split(line, " improper types")[1])
+                nimproper_types = parse(Int, split(line)[1])
             elseif occursin("xlo xhi", line)
+                box = zeros(3, 2)
                 values = split(line)
-                box[1, : ] = [parse(Float32, values[1]), parse(Float32, values[2])]
-            elseif occursin("ylo yhi", line)
-                values = split(line)
-                box[1, : ] = [parse(Float32, values[1]), parse(Float32, values[2])]
-            elseif occursin("zlo zhi", line)
-                values = split(line)
-                box[1, : ] = [parse(Float32, values[1]), parse(Float32, values[2])]
+                box[1, : ] = [parse(Float64, values[1]), parse(Float64, values[2])]
+                values = split(removeComment(readline(f)))
+                box[2, : ] = [parse(Float64, values[1]), parse(Float64, values[2])]
+                values = split(removeComment(readline(f)))
+                box[3, : ] = [parse(Float64, values[1]), parse(Float64, values[2])]
+                return_dict["box"] = box
             elseif occursin("xy xz yz", line)
                 values = split(line)
-                tilt = [parse(Float32, values[1]), parse(Float32, values[2]), parse(Float32, values[3])]
+                return_dict["tilt"] = [parse(Float64, values[1]), parse(Float64, values[2]), parse(Float64, values[3])]
             elseif occursin("extra bond per atom", line)
                 continue
             elseif occursin("extra angle per atom", line)
@@ -149,31 +128,12 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
             end
         end
 
-        # Body values
-        atom_ids = zeros(Int, natoms)
-        molecules = zeros(Int, natoms)
-        atom_types = zeros(Int, natoms)
-        charges = zeros(Float32, natoms)
-        coords = zeros(Float32, natoms, 3)
-        images = zeros(Int, natoms, 3)
-        velocities = zeros(Float32, natoms, 3)
-        the_rest = zeros(Float32, natoms, 2)
-
-        # Molecule body values
-        bonds = zeros(Int, nbonds, 2)
-        angles = zeros(Int, nangles, 3)
-        dihedrals = zeros(Int, ndihedrals, 4)
-        impropers = zeros(Int, nimpropers, 4)
-        bond_types = zeros(Int, nbond_types)
-        angle_types = zeros(Int, nangle_types)
-        dihedral_types = zeros(Int, ndihedral_types)
-        improper_types = zeros(Int, nimproper_types)
-
-        # Body sections supported: Atoms, Velocities, Masses, Bonds, Angles, Dihedrals, Impropers,
-        #       Pair Coeffs, PairIJ Coeffs, Bond Coeffs, Angle Coeffs, Dihedral Coeffs, Improper Coeffs
-        # Body sections
-        indices = zeros(Int, natoms)  # for sorting
-        while true
+        # Body sections supported: 
+        #       Atoms, Velocities, Bonds, Angles, Dihedrals, Impropers
+        # Body sections not supported (per-atom-type instead of per-atom):
+        #       Masses, Pair Coeffs, PairIJ Coeffs, Bond Coeffs, Angle Coeffs,
+        #       Dihedral Coeffs, Improper Coeffs
+        while !eof(f)
             if removeComment(line) == ""
                 line = readline(f)
                 continue
@@ -190,7 +150,7 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
                 readline(f)  # Skip next line
 
                 line = readline(f)
-                first_row_data = parse.(Float32, split(removeComment(line)))
+                first_row_data = parse.(Float64, split(removeComment(line)))
                 
                 num_cols = length(first_row_data)
                 if num_cols != base_num_cols && num_cols != base_num_cols + 3
@@ -201,56 +161,57 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
                     image_flag = true
                 end
 
-                tmp_data = zeros(num_cols, natoms)
+                tmp_data = zeros(num_cols, return_dict["natoms"])
                 tmp_data[ : , 1] = first_row_data
                 tmp_data[ : , 2:end] = readDataSection(f, tmp_data[ : , 2:end])
 
                 indices = sortperm(tmp_data[1, : ])
                 tmp_data = tmp_data[ : , indices]
                 
-                atom_ids = Integer.(tmp_data[1, : ])
+                return_dict["atomIDs"] = Int.(tmp_data[1, : ])
                 if atom_style == "atomic"
-                    atom_types = Integer.(tmp_data[2, : ])
-                    coords = tmp_data[3:5, : ]'
+                    return_dict["atom_types"] = Int.(tmp_data[2, : ])
+                    return_dict["coords"] = tmp_data[3:5, : ]'
                 elseif atom_style == "charge"
-                    atom_types = Integer.(tmp_data[2, : ])
-                    charges = tmp_data[3, : ]
-                    coords = tmp_data[4:6, : ]'
+                    return_dict["atom_types"] = Int.(tmp_data[2, : ])
+                    return_dict["charges"] = tmp_data[3, : ]
+                    return_dict["coords"] = tmp_data[4:6, : ]'
                 elseif (
                     atom_style == "molecular"
                     || atom_style == "bond"
                     || atom_style == "angle"
                 )
-                    molecules = Integer.(tmp_data[2, : ])
-                    atom_types = Integer.(tmp_data[3, : ])
-                    coords = tmp_data[4:6, : ]'
+                    return_dict["molecules"] = Int.(tmp_data[2, : ])
+                    return_dict["atom_types"] = Int.(tmp_data[3, : ])
+                    return_dict["coords"] = tmp_data[4:6, : ]'
                 elseif atom_style == "full"
-                    molecules = Integer.(tmp_data[2, : ])
-                    atom_types = Integer.(tmp_data[3, : ])
-                    charges = tmp_data[4, : ]
-                    coords = tmp_data[5:7, : ]'
+                    return_dict["molecules"] = Int.(tmp_data[2, : ])
+                    return_dict["atom_types"] = Int.(tmp_data[3, : ])
+                    return_dict["charges"] = tmp_data[4, : ]
+                    return_dict["coords"] = tmp_data[5:7, : ]'
                 elseif (
-                    atom_style == "line
-                    mesont
-                    bpm/sphere
-                    tri"
+                    atom_style == "line"
+                    || atom_style == "mesont"
+                    || atom_style == "bpm/sphere"
+                    || atom_style == "tri"
                 )
-                    molecules = Integer.(tmp_data[2, : ])
-                    atom_types = Integer.(tmp_data[3, : ])
-                    the_rest = image_flag ? tmp_data[4:end-6, : ]' : tmp_data[4:end-3, : ]'
-                    coords = image_flag ? tmp_data[end-5:end-3, : ]' : tmp_data[end-2:end, : ]'
+                    return_dict["molecules"] = Int.(tmp_data[2, : ])
+                    return_dict["atom_types"] = Int.(tmp_data[3, : ])
+                    return_dict["the_rest"] = image_flag ? tmp_data[4:end-6, : ]' : tmp_data[4:end-3, : ]'
+                    return_dict["coords"] = image_flag ? tmp_data[end-5:end-3, : ]' : tmp_data[end-2:end, : ]'
                 else
-                    atom_types = Integer.(tmp_data[2, : ])
-                    the_rest = image_flag ? tmp_data[4:end-6, : ]' : tmp_data[4:end-3, : ]'
-                    coords = image_flag ? tmp_data[end-5:end-3, : ]' : tmp_data[end-2:end, : ]'
+                    return_dict["atom_types"] = Int.(tmp_data[2, : ])
+                    return_dict["the_rest"] = image_flag ? tmp_data[4:end-6, : ]' : tmp_data[4:end-3, : ]'
+                    return_dict["coords"] = image_flag ? tmp_data[end-5:end-3, : ]' : tmp_data[end-2:end, : ]'
                 end
                 if image_flag
-                    images = Integer.(tmp_data[end-2:end, : ]')
+                    return_dict["images"] = Int.(tmp_data[end-2:end, : ]')
                 end
-                idtoindex = zeros(maximum(atom_ids))
-                for (i, a) in enumerate(atom_ids)
+                idtoindex = zeros(maximum(atomIDs))
+                for (i, a) in enumerate(atomIDs)
                     idtoindex[a] = i
                 end
+                return_dict["idtoindex"] = idtoindex
 
             elseif occursin("Velocities", line)
                 readline(f)  # Blank
@@ -259,34 +220,34 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
                 # Try applying indices from Atoms section to sort velocities by ID
                 # Check if sorted. If not, sort normally. Will usually save time.
                 issorted(data[1, indices]) || (indices = sortperm(data[1, : ]))
-                velocities = data[2:4, indices]'
+                return_dict["velocities"] = data[2:4, indices]'
             elseif occursin("Masses", line)  # Not yet implemented
                 readline(f)  # Blank
                 for i in 1:natom_types; readline(f); end
             elseif nbonds > 0 && occursin("Bonds", line)
                 readline(f)  # Blank
-                data = zeros(Integer, 4, nbonds)
+                data = zeros(Int, 4, nbonds)
                 data = readDataSection(f, data)
-                bond_types = data[2, : ]
-                bonds = data[3:4, : ]'
+                return_dict["bond_types"] = data[2, : ]
+                return_dict["bonds"] = data[3:4, : ]'
             elseif nangles > 0 && occursin("Angles", line)
                 readline(f)  # Blank
-                data = zeros(Integer, 5, nangles)
+                data = zeros(Int, 5, nangles)
                 data = readDataSection(f, data)
-                angle_types = data[2, : ]
-                angles = data[3:5, : ]'
+                return_dict["angle_types"] = data[2, : ]
+                return_dict["angles"] = data[3:5, : ]'
             elseif ndihedrals > 0 && occursin("Dihedrals", line)
                 readline(f)  # Blank
-                data = zeros(Integer, 6, ndihedrals)
+                data = zeros(Int, 6, ndihedrals)
                 data = readDataSection(f, data)
-                dihedral_types = data[2, : ]
-                dihedrals = data[3:6, : ]'
+                return_dict["dihedral_types"] = data[2, : ]
+                return_dict["dihedrals"] = data[3:6, : ]'
             elseif nimpropers > 0 && occursin("Impropers", line)
                 readline(f)  # Blank
-                data = zeros(Integer, 7, nimpropers)
+                data = zeros(Int, 7, nimpropers)
                 data = readDataSection(f, data)
-                improper_types = data[2, : ]
-                impropers = data[3:6, : ]'
+                return_dict["improper_types"] = data[2, : ]
+                return_dict["impropers"] = data[3:6, : ]'
             elseif occursin("Pair Coeffs", line)  # Not yet implemented
                 readline(f)  # Blank
                 for i in 1:natom_types; readline(f); end
@@ -307,32 +268,147 @@ function readData(source::AbstractString, atom_style::AbstractString="full")
                 for i in 1:nimproper_types; readline(f); end
             end
             line = readline(f)
-            if eof(f)
-                break
+        end
+    end
+    return_dict
+end
+
+"""
+Currently, very few checks are performed. Should account for atom style, natoms is 
+consistent, etc.
+"""
+function verifySnapshot(snapshot::Dict{String, <:Array{<:Real}}, atom_style::AbstractString)
+    atomIDs = snapshot["atomIDs"]
+    ndims(atomIDs) != 1 && throw(DimensionMismatch(
+        "atomIDs must have 1 dimenstion, found $(ndims(atomIDs))"
+        ))
+    natoms = length(atomIDs)
+    
+    atom_types = snapshot["atom_types"]
+    ndims(atom_types) != 1 && throw(DimensionMismatch(
+        "atom_types must have 1 dimenstion, found $(ndims(atom_types))"
+        ))
+    length(atom_types) != natoms && throw(DimensionMismatch(
+        "atom_types must have the same length as atomIDs,"
+        " found $(length(atom_types)) and $natoms, respectively"
+    ))
+    natom_types = maximum(atom_types)
+        
+    coords = snapshot["coords"]
+    ndims(coords) != 2 && throw(DimensionMismatch(
+        "coords must have 1 dimenstion, found $(ndims(coords))"
+    ))
+    size(coords, 1) != natoms && throw(DimensionMismatch(
+        "coords must have the same dim-1 length as atomIDs,"
+        " found $(size(coords, 1)) and $natoms, respectively"
+    ))
+    size(coords, 2) != 3 && throw(DimensionMismatch(
+        "coords must have 3 columns, found $(size(coords, 2))"
+    ))
+
+end
+
+function writeData(datafile::AbstractString, snapshot::Dict{String, <:Array{<:Real}}, atom_style::AbstractString)
+    if !(atom_style in ["atomic", "molecular", "angle", "bond", "charge", "full"])
+        throw(ArgumentError(
+            "Invalid atom_style '$atom_style'. Must be one of"
+            " 'atomic', 'molecular', 'angle', 'bond', 'charge', or 'full'."
+        ))
+    end
+
+    verifySnapshot(snapshot, atom_style)
+
+    hasbonds = haskey(snapshot, "bonds")  # implies hasmolecules
+    hasangles = haskey(snapshot, "angles")
+    hasdihedrals = haskey(snapshot, "dihedrals")
+    hasimpropers = haskey(snapshot, "impropers")
+    hastilt = haskey(snapshot, "tilt")
+    hasimages = haskey(snapshot, "images")
+    hascharges = haskey(snapshot, "charges")
+    hasvelocities = haskey(snapshot, "velocities")
+
+    natoms = length(snapshot["atom_types"])
+    natom_types = maximum(snapshot["atom_types"])
+    if hasbonds
+        nbonds = length(snapshot["bond_types"])
+        nbond_types = maximum(snapshot["bond_types"])
+    end
+    if hasangles
+        nangles = length(snapshot["angle_types"])
+        nangle_types = maximum(snapshot["angle_types"])
+    end
+    if hasdihedrals
+        ndihedrals = length(snapshot["dihedral_types"])
+        ndihedral_types = maximum(snapshot["dihedral_types"])
+    end
+    if hasimpropers
+        nimpropers = length(snapshot["improper_types"])
+        nimproper_types = maximum(snapshot["improper_types"])
+    end
+
+    open(datafile, "w") do f
+        write(f, "# LAMMPS data file written by Michael Jacobs' LammpsFiles code\n\n")
+        write(f, "$natoms atoms\n")
+        if hasbonds write(f, "$nbonds bonds") end
+        if hasangles write(f, "$nangles angles") end
+        if hasdihedrals write(f, "$ndihedrals dihedrals") end
+        if hasimpropers write(f, "$nimpropers impropers") end
+        write(f, "$natom_types atom types")
+        if hasbonds write(f, "$nbond_types bond types") end
+        if hasangles write(f, "$nangle_types angle types") end
+        if hasdihedrals write(f, "$ndihedral_types dihedral types") end
+        if hasimpropers write(f, "$nimproper_types improper types") end
+        box = snapshot["box"]
+        for (i, d) in enumerate(['x', 'y', 'z'])
+            write(f, "$(box[i, 1]) $(box[i, 2]) $(d)lo $(d)hi\n")
+        end
+        if hastilt write(f, "$(snapshot["tilt"][1]) $(snapshot["tilt"][2]) $(snapshot["tilt"][3]) xy xz yz\n\n") end
+
+        write(f, "Atoms # $atom_style\n\n")
+        for i=1:natoms
+            write(f, "$(snapshot["atomIDs"][i])")
+            if hasbonds write(f, " $(snapshot["molecules"][i])") end
+            write(f, " $(snapshot["atom_types"][i])")
+            if hascharges write(f, " $(snapshot["charges"][i])") end
+            write(f, " $(snapshot["coords"][i, 1]) $(snapshot["coords"][i, 2]) $(snapshot["coords"][i, 3])")
+            if hasimages write(f, " $(snapshot["images"][i, 1]) $(snapshot["images"][i, 2]) $(snapshot["images"][i, 3])") end
+            write(f, "\n")
+        end
+
+        if hasvelocities
+            write(f, "\nVelocities\n\n")
+            for (id, vel) in zip(snapshot["atomIDs"], eachrow(snapshot["velocities"]))
+                write(f, "$id $(vel[1]) $(vel[2]) $(vel[3])\n")
+            end
+        end
+
+        if hasbonds
+            write(f, "\nBonds\n\n")
+            for (i, (bt, bond)) in enumerate(zip(snapshot["bond_types"], eachrow(snapshot["bonds"])))
+                write(f, "$i $bt $(bond[1]) $(bond[2])\n")
+            end
+        end
+
+        if hasangles
+            write(f, "\nAngles\n\n")
+            for (i, (at, angle)) in enumerate(zip(snapshot["angle_types"], eachrow(snapshot["angles"])))
+                write(f, "$i $at $(angle[1]) $(angle[2]) $(angle[3])\n")
+            end
+        end
+
+        if hasdihedrals
+            write(f, "\nDihedrals\n\n")
+            for (i, (dt, dihedral)) in enumerate(zip(snapshot["dihedral_types"], eachrow(snapshot["dihedrals"])))
+                write(f, "$i $dt $(dihedral[1]) $(dihedral[2]) $(dihedral[3]) $(dihedral[4])\n")
+            end
+        end
+
+        if hasimpropers
+            write(f, "\nImpropers\n\n")
+            for (i, (bt, improper)) in enumerate(zip(snapshot["improper_types"], eachrow(snapshot["impropers"])))
+                write(f, "$i $bt $(improper[1]) $(improper[2]) $(improper[3]) $(improper[4])\n")
             end
         end
     end
-    snapshot(
-        atom_ids,
-        idtoindex,
-        molecules,
-        atom_types,
-        charges,
-        coords,
-        images,
-        velocities,
-        the_rest,
-        bonds,
-        angles,
-        dihedrals,
-        impropers,
-        bond_types,
-        angle_types,
-        dihedral_types,
-        improper_types
-    )
-end
-
-function writeData(source::AbstractString, snap::snapshot, atom_style::AbstractString)
     return nothing
 end
