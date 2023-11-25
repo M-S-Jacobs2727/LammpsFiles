@@ -84,9 +84,9 @@ function readDump(source::AbstractString)
     end
 
     atom_ids = atoms[findfirst(x->x=="id", properties), : ]
-    idtoindex = zeros(maximum(atom_ids))
+    idtoindex = zeros(Int(maximum(atom_ids)))
     for (i, a) in enumerate(atom_ids)
-        idtoindex[a] = i
+        idtoindex[Int(a)] = i
     end
 
     return (
